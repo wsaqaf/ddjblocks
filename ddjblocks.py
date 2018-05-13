@@ -42,9 +42,9 @@ def save_tx_csv(fn):
 	global cur
 
         with open(fn, 'w') as csvfile:
-               csvfile.write("tx_hash,from,to,time_sent,value_sent_btc,value_sent_usd,fee,city,is_utxo,messages\n");
+               csvfile.write("from,to,time_sent,value_sent_btc,value_sent_usd,fee,city,is_utxo,messages,tx_hash\n");
 
-        query="SELECT tx_i,from_addr,to_addr,time_sent,amount_sent*0.00000001,(select amount_sent*0.00000001*(select rate_usd from ddjblocks.btc_rates where i_date=time_sent::date)),fee*0.00000001,(select city FROM geoip_city(relayed_ip::inet)),is_utxo,messages FROM ddjblocks."+filename+"transactions"
+        query="SELECT from_addr,to_addr,time_sent,amount_sent*0.00000001,(select amount_sent*0.00000001*(select rate_usd from ddjblocks.btc_rates where i_date=time_sent::date)),fee*0.00000001,(select city FROM geoip_city(relayed_ip::inet)),is_utxo,messages,tx_i FROM ddjblocks."+filename+"transactions"
         outputquery = "COPY ({0}) TO STDOUT WITH CSV ".format(query)
 
         with open(fn, 'a') as f:
@@ -66,7 +66,6 @@ def save_addr_csv(fn,mode):
 
         	with open(fn, 'a') as csvfile:
                 	for a in all_addresses:
-                        	cur.execute("INSERT INTO "+filename+"addresses VALUES('"+a+"') ON CONFLICT (address) DO NOTHING;")
                         	csvfile.write(a+"\n");
 	else:
                 with open(fn, 'w') as csvfile:
@@ -124,7 +123,7 @@ def create_address_table(tble):
 	global cur
 
         try:
-                cur.execute("CREATE TABLE "+tble+" (address VARCHAR(255) PRIMARY KEY)")
+                cur.execute("CREATE TABLE "+tble+" (address VARCHAR(255) PRIMARY KEY, updated TIMESTAMP, tx_count INTEGER)")
 		cur.execute("CREATE INDEX ON "+tble+" (address);")
 
                 print "New address table "+tble+" created."
@@ -176,7 +175,7 @@ def csv_to_array(fl): # use descriptive variable names
         yield el # don't return, that immediately ends the function
 
 ###
-def load_addr(address_id,addr):
+def load_addr(addr):
 	global filename
 	global processed
 	global total_addresses
@@ -187,22 +186,34 @@ def load_addr(address_id,addr):
 
 	tx_count=0
 
-	all_addresses=[addr['address']]+all_addresses
+	all_addresses=[addr]+all_addresses
 	
 	tx_left=1
 	offset_id=0
 
 	while (1):
 	   if (tx_count==0):
-	        address = blockexplorer.get_address(address_id,api_code=config.api_code)
-		tx_left=address.n_tx
+	        address = blockexplorer.get_address(addr,api_code=config.api_code)
+		cur.execute("SELECT tx_count FROM "+filename+"addresses WHERE address='"+addr+"';")
+		try:
+			old_n_tx=cur.fetchone()[0]
+			if (old_n_tx):
+				if old_n_tx<address.n_tx:
+					tx_count=old_n_tx
+					print "Updating tx record for "+addr
+					continue				 
+				else:
+					print "TX record for "+addr+" up-to-date. Skipping..."
+					break	
+                except:
+                        pass
 	   else:
                 tx_left=address.n_tx-tx_count
 		if (tx_left==0):
 			break
 		else:
 			offset_id=tx_count
-			address = blockexplorer.get_address(address_id,offset=offset_id,api_code=config.api_code)
+			address = blockexplorer.get_address(addr,offset=offset_id,api_code=config.api_code)
 	   for transaction in address.transactions:
         	if (transaction.double_spend or transaction.block_height==-1):
 			continue
@@ -239,12 +250,12 @@ def load_addr(address_id,addr):
                                                 decoded_msg=''.join(x for x in decoded_msg if x in string.printable)
                                                 decoded_msg=decoded_msg.replace('\r',' ').replace('\n',' ')
                                                 encoded_messages=encoded_messages+decoded_msg+"\n"
-                                if (input.address==addr['address']):
+                                if (input.address==addr):
                                         sent_amount=input.value+sent_amount
                                         sending_tx=1
 				in_count+=1
                                 total_input=input.value+total_input
-				if (input.address==addr['address']):
+				if (input.address==addr):
 					found_change_addresses=1
 				if (input.value>max_input):
 					main_sending_address=input.address
@@ -258,7 +269,7 @@ def load_addr(address_id,addr):
 						decoded_msg=''.join(x for x in decoded_msg if x in string.printable)
 						decoded_msg=decoded_msg.replace('\r',' ').replace('\n',' ')
 						encoded_messages=encoded_messages+decoded_msg+"\n"
-				if (output.address==addr['address']):
+				if (output.address==addr):
 					received_amount=output.value+received_amount
 					receiving_tx=1
 					if (not output.spent):
@@ -271,20 +282,21 @@ def load_addr(address_id,addr):
 				total_output=output.value+total_output
                 fee=(total_input-total_output)
 	   	if (receiving_tx):
-                	row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr['address']+"', '"+str(tx_time)+"', "+str(received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'"+encoded_messages.replace("'","''")+"'"
+                	row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'"+encoded_messages.replace("'","''")+"'"
                         cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
                 if (sending_tx):
-                        row="'"+transaction.hash+"', '"+addr['address']+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+",'"+encoded_messages.replace("'","''")+"'"
+                        row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+",'"+encoded_messages.replace("'","''")+"'"
                         cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 	   	if (found_change_addresses):
 			all_addresses=list(set(all_addresses)|set(change_addresses))
-			all_addresses.remove(addr['address'])
-			all_addresses=[addr['address']]+all_addresses
+			all_addresses.remove(addr)
+			all_addresses=[addr]+all_addresses
+
+	cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(address.n_tx)+") ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(address.n_tx)+";")
 
    	processed+=1
-	perc=round((processed/total_addresses),4)*100;
-
-	print processed,") Processed address "+ "%",perc;
+	perc=(100*processed)/total_addresses;
+	print processed,") Processed address "+ "%"+str(perc);
 	
 	return
 ###
@@ -363,8 +375,20 @@ for index, row in addresses.iterrows():
         if (processed>=config.max_addresses):
                 print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
                 break;
-	load_addr(row['address'],row)
-	processed+=1
+	load_addr(row['address'])
+
+for x in range(0, config.move_forward):
+	cur.execute("Select distinct to_addr from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses);")
+        new_list=cur.fetchall()
+        for ad in new_list:
+		load_addr(ad[0])
+
+for x in range(0, config.go_backward):
+        cur.execute("Select distinct from_addr from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses);")
+        new_list=cur.fetchall()
+        for ad in new_list:
+                load_addr(ad[0])
+
 
 save_tx_csv("output/"+filename+"transactions.csv")
 

@@ -15,6 +15,12 @@ max_addresses=10
 # 1 means incoming only, 2 means outgoing only, 0 means both are allowed
 direction=0 
 
+# by move forward, you ask ddjblocks to recursively add new addresses that emerge in the "To" column of the transaction. The value is how many iterations/hops you want to go.
+move_forward=0  
+
+# by move forward, you ask ddjblocks to recursively add new addresses that emerge in the "To" column of the transaction. 
+go_backward=0
+
 # This is where the daily average rates for BTCUSD would be kept
 rates_file="rates/btcusd_daily_rates.csv" 
 

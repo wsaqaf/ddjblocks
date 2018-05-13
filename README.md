@@ -40,7 +40,6 @@ Once done, the operation will generate by default the following three CSV files 
 
 Below are the results one finds in the transaction CSV file:
 
-* **tx_hash**: the hash of the transaction, which is useful to cross-validate using blockchain explorers
 * **from**: address sending the fund
 * **to**: address receiving it
 * **time**: the time the transaction was mined
@@ -50,6 +49,7 @@ Below are the results one finds in the transaction CSV file:
 * **city**: The city where the relayed IP is located
 * **is_utxo**: A flag indicating whether the output transaction was spent
 * **messages**: Any OP_RETURN messages that were found in the transaction
+* **tx_hash**: the hash of the transaction, which is useful to cross-validate using blockchain explorers
 
 Once you have this data, you have many ways to analyze it. For example, you can answer questions like:
 - How frequently do funds get sent and from/to whom
@@ -57,7 +57,7 @@ Once you have this data, you have many ways to analyze it. For example, you can 
 - How long do they stay before they are spent (no longer unspent transactions)
 - Where are the transactions taking place (cities when geolocation data is available)
 - What embedded messages appear (OP_RETURN)
-- To follow a specific address, it is possible to rerun the script with that address (in future versions, we could have this done automated although it can quickly go out of control)
+- To follow a specific address, it is possible to rerun the script with that address using the "go_forward" or "move_backward" parameters in the configuration file. Rerunning the tool multiple times can create a very complex and multilayered network
 - What networks emerge over time (this could lead to using social network analysis and visualisaiton tools such as [Kumu](https://kumu.io))
 
 # Future work:
