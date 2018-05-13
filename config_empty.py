@@ -10,7 +10,7 @@ dbpw="datajournalism"
 change_addresses=0
 
 # How many addresses should the script be able to handle at once
-max_addresses=10 
+max_addresses=10000 
 
 # 1 means incoming only, 2 means outgoing only, 0 means both are allowed
 direction=0 
