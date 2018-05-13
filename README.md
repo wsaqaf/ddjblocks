@@ -1,7 +1,7 @@
 # ddjblocks
 DDJBlocks - a Data-Driven Journalism tool to analyze blockchain data
 
-DDJBlocks is a simple but unique tool that is intended to be useful for data journalists and researchers to extract transaction records from the bitcoin Main blockchain for further analysis. Since the learning curve on how to read and extract data from public permissionless blockchains is steep for many, I decided to create this tool to save time and energy in the process of developing 
+DDJBlocks is a simple but unique tool that is intended to be useful for data journalists and researchers to extract transaction records from the bitcoin Main blockchain for further analysis. Since the learning curve on how to read and extract data from public permissionless blockchains is steep for many, I decided to create this tool to save time and energy of those interested to dig deeper into this often mysterious arena. With all the hype around bitcoin and blockchain, it is high time data and investigative journalists have some way to study bitcoin transactions.
 
 The tool is in development mode and is under continuous testing to find bugs and make improvements.
 
@@ -33,7 +33,10 @@ $ python ddjblocks.py cases/wannacry.csv
 
 The script should then access the blockchain explorer, retreive the transactions and connect addresses with each other. Additionally, it uses the relayed IP parameters to detect the city (using geolocation data obtained from MaxMind) and adds a USD converted value based on the time of the particular transaction. The USD value of the transaction needs to be assessed carefully depending on whether the transaction was spent or not. 
 
-Once done, there will be two files generated in the output folder. One file would be postfixed with -change.csv as it will contain the list of addresses that are suspected to be change addresses belonging to the one of the addresses given in the original file. This would be useful to use as new input to go deeper into analyzing the account if needed. The other CSV file will contain the transactions themselves. Note that in cases where multiple input addresses were used, only one address (the one with the highest amount of pay) is used as the 'sender' of the amount. The other accounts are assumed to be change addresses and hence they belong to the same wallet.
+Once done, the operation will generate by default the following three CSV files in the output folder:
+- <case_name>_all_addresses.csv: this contains all addresses that either received or send funds to the given addresses. It also includes the analyzed addresses themselves
+- <case_name>_change_addresses.csv: this will contain the list of addresses that are suspected to be change addresses belonging to the one of the addresses given in the original file. Knowing those addresses may be useful to use as new input to go deeper into analyzing the account if needed. 
+- <case_name>_transactions.csv: This CSV file will contain the transactions themselves. Note that in cases where multiple input addresses were used to transmit a fund to one of the analyzed addresses, only one address (the one with the highest amount of BTC) is used as the 'sender' of the amount. The other accounts are assumed to be change addresses and hence they belong to the same wallet. This was a necessary measure to be able to map out relationships between two addresses.
 
 Below are the results one finds in the transaction CSV file:
 

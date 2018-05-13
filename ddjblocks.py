@@ -54,19 +54,31 @@ def save_tx_csv(fn):
 
 ###
 
-def save_addr_csv(fn):
+def save_addr_csv(fn,mode):
 
         global filename
 	global all_addresses
 	global cur
 
-        with open(fn, 'w') as csvfile:
-                csvfile.write("address\n");
+	if mode==1:
+        	with open(fn, 'w') as csvfile:
+                	csvfile.write("address\n");
 
-        with open(fn, 'a') as csvfile:
-                for a in all_addresses:
-                        cur.execute("INSERT INTO "+filename+"addresses VALUES('"+a+"') ON CONFLICT (address) DO NOTHING;")
-                        csvfile.write(a+"\n");
+        	with open(fn, 'a') as csvfile:
+                	for a in all_addresses:
+                        	cur.execute("INSERT INTO "+filename+"addresses VALUES('"+a+"') ON CONFLICT (address) DO NOTHING;")
+                        	csvfile.write(a+"\n");
+	else:
+                with open(fn, 'w') as csvfile:
+                        csvfile.write("Label\n");
+
+		cur.execute("SELECT distinct from_addr FROM "+filename+"transactions UNION SELECT distinct to_addr FROM "+filename+"transactions;")
+		
+		distinct_addresses=cur.fetchall()
+		
+                with open(fn, 'a') as csvfile:
+                        for a in distinct_addresses:
+                                csvfile.write(str(a[0])+"\n");
 
         return
 
@@ -357,9 +369,11 @@ for index, row in addresses.iterrows():
 save_tx_csv("output/"+filename+"transactions.csv")
 
 if config.change_addresses:
-        save_addr_csv(original_file)
+        save_addr_csv(original_file,1)
 else:
-	save_addr_csv("output/"+filename+"change_addresses.csv")
+	save_addr_csv("output/"+filename+"change_addresses.csv",1)
+
+save_addr_csv("output/"+filename+"all_addresses.csv",2)
 
 print "Done!"
 
