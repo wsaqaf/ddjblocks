@@ -1,4 +1,4 @@
-![DDJBlocks](logo.png)
+![DDJBlocks](images/logo.png)
 # DDJBLOCKS
 DDJBlocks - a Data-Driven Journalism tool to analyze blockchain data
 
