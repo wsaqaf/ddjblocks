@@ -42,9 +42,9 @@ def save_tx_csv(fn):
 	global cur
 
         with open(fn, 'w') as csvfile:
-               csvfile.write("from,to,time_sent,value_sent_btc,value_sent_usd,fee,city,is_utxo,messages,tx_hash\n");
+               csvfile.write("from,to,time_sent,value_sent_btc,value_sent_usd,fee,city,is_utxo,notes,tx_hash,messages\n");
 
-        query="SELECT from_addr,to_addr,time_sent,amount_sent*0.00000001,(select amount_sent*0.00000001*(select rate_usd from ddjblocks.btc_rates where i_date=time_sent::date)),fee*0.00000001,(select city FROM geoip_city(relayed_ip::inet)),is_utxo,notes,messages,tx_i FROM ddjblocks."+filename+"transactions"
+        query="SELECT from_addr,to_addr,time_sent,amount_sent*0.00000001,(select amount_sent*0.00000001*(select rate_usd from ddjblocks.btc_rates where i_date=time_sent::date)),fee*0.00000001,(select city FROM geoip_city(relayed_ip::inet)),is_utxo,notes,tx_i,messages FROM ddjblocks."+filename+"transactions"
         outputquery = "COPY ({0}) TO STDOUT WITH CSV ".format(query)
 
         with open(fn, 'a') as f:
