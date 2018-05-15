@@ -44,7 +44,7 @@ def save_tx_csv(fn):
         with open(fn, 'w') as csvfile:
                csvfile.write("from,to,time_sent,value_sent_btc,value_sent_usd,fee,city,is_utxo,messages,tx_hash\n");
 
-        query="SELECT from_addr,to_addr,time_sent,amount_sent*0.00000001,(select amount_sent*0.00000001*(select rate_usd from ddjblocks.btc_rates where i_date=time_sent::date)),fee*0.00000001,(select city FROM geoip_city(relayed_ip::inet)),is_utxo,messages,tx_i FROM ddjblocks."+filename+"transactions"
+        query="SELECT from_addr,to_addr,time_sent,amount_sent*0.00000001,(select amount_sent*0.00000001*(select rate_usd from ddjblocks.btc_rates where i_date=time_sent::date)),fee*0.00000001,(select city FROM geoip_city(relayed_ip::inet)),is_utxo,notes,messages,tx_i FROM ddjblocks."+filename+"transactions"
         outputquery = "COPY ({0}) TO STDOUT WITH CSV ".format(query)
 
         with open(fn, 'a') as f:
@@ -139,7 +139,7 @@ def create_tx_table(tble):
 
       	try:
         	cur.execute("CREATE TABLE "+tble+" (tx_i VARCHAR(255) PRIMARY KEY, from_addr VARCHAR(255), to_addr VARCHAR(255), time_sent TIMESTAMP, "
-			    "amount_sent real, fee real, relayed_IP VARCHAR(255), is_utxo boolean, messages VARCHAR(255));")
+			    "amount_sent real, fee real, relayed_IP VARCHAR(255), is_utxo boolean, notes VARCHAR(255), messages VARCHAR(255));")
                 cur.execute("CREATE INDEX ON "+tble+" (tx_i);")
 
         	print "New tx table "+tble+" created."
@@ -183,6 +183,8 @@ def load_addr(addr):
 	global new_addresses
 	global cur
 	global all_addresses
+	global current_level
+	global in_depth
 
 	tx_count=0
 
@@ -203,7 +205,7 @@ def load_addr(addr):
 					print "Updating tx record for "+addr
 					continue				 
 				else:
-					print "TX record for "+addr+" up-to-date. Skipping..."
+					print in_depth+str(current_level)+"TX record for "+addr+" up-to-date. Skipping..."
 					break	
                 except:
                         pass
@@ -238,7 +240,7 @@ def load_addr(addr):
 		change_addresses=[]
 		encoded_messages=""
 
-                print "TX:",tx_count,transaction.hash
+                print in_depth+str(current_level)+"TX:",tx_count,transaction.hash," ("+str(tx_count)+"/"+str(address.n_tx)+")"
 
         	if (config.direction!=2):
           		for input in transaction.inputs:
@@ -282,10 +284,10 @@ def load_addr(addr):
 				total_output=output.value+total_output
                 fee=(total_input-total_output)
 	   	if (receiving_tx):
-                	row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'"+encoded_messages.replace("'","''")+"'"
+                	row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                         cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
                 if (sending_tx):
-                        row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+",'"+encoded_messages.replace("'","''")+"'"
+                        row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                         cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 	   	if (found_change_addresses):
 			all_addresses=list(set(all_addresses)|set(change_addresses))
@@ -356,7 +358,7 @@ if not cur.fetchone():
 			update_rates_file()
 			print "Updated rates file from bitcoinaverage.com!"
 		else:
-			print "using old file"
+			print "using existing rates file"
 	except:
                 update_rates_file()
                 print "Updated rates file from bitcoinaverage.com!"
@@ -371,19 +373,27 @@ if not cur.fetchone():
 total_addresses=addresses.address.count()
 all_addresses=[]
 
+current_level=""
+in_depth=""
+
 for index, row in addresses.iterrows():
         if (processed>=config.max_addresses):
                 print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
                 break;
 	load_addr(row['address'])
 
+	current_level=0
+	in_depth="F"
 for x in range(0, config.move_forward):
+	current_level+=1
 	cur.execute("Select distinct to_addr from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses);")
         new_list=cur.fetchall()
         for ad in new_list:
 		load_addr(ad[0])
 
+	in_depth="B"
 for x in range(0, config.go_backward):
+	current_level+=1
         cur.execute("Select distinct from_addr from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses);")
         new_list=cur.fetchall()
         for ad in new_list:
