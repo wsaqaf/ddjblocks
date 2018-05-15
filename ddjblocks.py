@@ -382,8 +382,8 @@ for index, row in addresses.iterrows():
                 break;
 	load_addr(row['address'])
 
-	current_level=0
-	in_depth="F"
+current_level=0
+in_depth="F"
 for x in range(0, config.move_forward):
 	current_level+=1
 	cur.execute("Select distinct to_addr from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses);")
@@ -391,14 +391,13 @@ for x in range(0, config.move_forward):
         for ad in new_list:
 		load_addr(ad[0])
 
-	in_depth="B"
+in_depth="B"
 for x in range(0, config.go_backward):
 	current_level+=1
         cur.execute("Select distinct from_addr from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses);")
         new_list=cur.fetchall()
         for ad in new_list:
                 load_addr(ad[0])
-
 
 save_tx_csv("output/"+filename+"transactions.csv")
 
