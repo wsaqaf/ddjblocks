@@ -1,4 +1,5 @@
 ![DDJBlocks](images/logo.png)
+
 DDJBlocks - a Data-Driven Journalism tool to analyze blockchain data
 
 DDJBlocks is a simple but unique tool that is intended to be useful for data journalists and researchers to extract transaction records from the bitcoin Main blockchain for further analysis. Since the learning curve on how to read and extract data from public permissionless blockchains is steep for many, I decided to create this tool to save time and energy of those interested to dig deeper into this often mysterious arena. With all the hype around bitcoin and blockchain, it is high time data and investigative journalists have some way to study bitcoin transactions.
