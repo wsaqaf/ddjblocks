@@ -28,7 +28,7 @@ python ddjblocks.py <file>
 where <file> is a CSV file containing a list of addresses (starting with the header *address*) to analyze for incoming and outgoing transactions. There is a preloaded file called wannacry.csv (containing three addresses known to belong to that ransomware) in the cases folder. To analyze that file, you can run the this command in the terminal:
 
 ```sh
-$ python ddjblocks.py cases/wannacry.csv
+$ python ddjblocks.py wannacry.csv
 
 ```
 

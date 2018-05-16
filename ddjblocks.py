@@ -192,8 +192,11 @@ def load_addr(addr):
 	
 	tx_left=1
 	offset_id=0
+	max_reached=0
 
 	while (1):
+	   if max_reached:
+		break
 	   if (tx_count==0):
 	        address = blockexplorer.get_address(addr,api_code=config.api_code)
 		cur.execute("SELECT tx_count FROM "+filename+"addresses WHERE address='"+addr+"';")
@@ -294,11 +297,16 @@ def load_addr(addr):
 			all_addresses.remove(addr)
 			all_addresses=[addr]+all_addresses
 
+                if (tx_count>=config.max_transactions):
+                        print "Reached max transactions",config.max_transactions,"... skipping this address and moving to next"
+                        max_reached=1
+			break
+
 	cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(address.n_tx)+") ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(address.n_tx)+";")
 
    	processed+=1
-	perc=(100*processed)/total_addresses;
-	print processed,") Processed address "+ "%"+str(perc);
+	perc=(100*processed)/config.max_addresses;
+	print "Processed address ("+str(processed)+"/"+str(config.max_addresses)+") [%"+str(perc)+"]";
 	
 	return
 ###
@@ -324,13 +332,13 @@ except psycopg2.OperationalError as e:
         sys.exit(1)
 
 if len(sys.argv)>1:
-        if os.path.isfile(sys.argv[1]):
+        if os.path.isfile("cases/"+sys.argv[1]):
                 print "Getting addresses from "+sys.argv[1]
-                filename=os.path.basename(sys.argv[1]).split('.')[0]+"_"
-		original_file=sys.argv[1]
-                addresses=pd.read_csv(sys.argv[1])
+                filename=os.path.basename("cases/"+sys.argv[1]).split('.')[0]+"_"
+		original_file="cases/"+sys.argv[1]
+                addresses=pd.read_csv("cases/"+sys.argv[1])
         else:
-                print "the input file "+sys.argv[1]+" could not be found"
+                print "the input file cases/"+sys.argv[1]+" could not be found"
                 cleanexit()
 else:
         print "No input CSV provided"
@@ -376,9 +384,12 @@ all_addresses=[]
 current_level=""
 in_depth=""
 
+max_reached=0
+
 for index, row in addresses.iterrows():
         if (processed>=config.max_addresses):
-                print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
+                print "Max addresses ("+str(config.max_addresses)+") processed, exiting...\n"
+		max_reached=1
                 break;
 	load_addr(row['address'])
 
@@ -386,17 +397,28 @@ current_level=0
 in_depth="F"
 for x in range(0, config.move_forward):
 	current_level+=1
-	cur.execute("Select distinct to_addr from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses);")
+	rw="Select distinct to_addr,sum(amount_sent) from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses) group by to_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";"
+	cur.execute(rw)
         new_list=cur.fetchall()
         for ad in new_list:
+	        if (processed>=config.max_addresses):
+        	        if not max_reached:
+				print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
+			max_reached=1
+			break;
 		load_addr(ad[0])
 
 in_depth="B"
 for x in range(0, config.go_backward):
 	current_level+=1
-        cur.execute("Select distinct from_addr from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses);")
+        cur.execute("Select distinct from_addr,sum(amount_sent) from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses) group by to_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";")
         new_list=cur.fetchall()
         for ad in new_list:
+                if (processed>=config.max_addresses):
+                        if not max_reached:
+				print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
+			max_reached=1
+                        break;
                 load_addr(ad[0])
 
 save_tx_csv("output/"+filename+"transactions.csv")
