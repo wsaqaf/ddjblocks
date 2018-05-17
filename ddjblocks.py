@@ -247,25 +247,28 @@ def load_addr(addr):
 
         	if (config.direction!=2):
           		for input in transaction.inputs:
-            			if (not input.value):
-					continue
-                                if input.address is None:
+				try:
+                                   if input.address is None:
                                         if (input.script.startswith("6a")):
                                                 decoded_msg=input.script[2:].decode("hex")
                                                 decoded_msg=''.join(x for x in decoded_msg if x in string.printable)
                                                 decoded_msg=decoded_msg.replace('\r',' ').replace('\n',' ')
                                                 encoded_messages=encoded_messages+decoded_msg+"\n"
-                                if (input.address==addr):
+					else:
+						continue
+                                   if (input.address==addr):
                                         sent_amount=input.value+sent_amount
                                         sending_tx=1
-				in_count+=1
-                                total_input=input.value+total_input
-				if (input.address==addr):
+				   in_count+=1
+                                   total_input=input.value+total_input
+				   if (input.address==addr):
 					found_change_addresses=1
-				if (input.value>max_input):
+				   if (input.value>max_input):
 					main_sending_address=input.address
 					max_input=input.value	
-				change_addresses.append(input.address)
+				   change_addresses.append(input.address)
+				except:
+				   pass
                 if (config.direction!=1):
                         for output in transaction.outputs:
 				if output.address is None:
@@ -274,6 +277,8 @@ def load_addr(addr):
 						decoded_msg=''.join(x for x in decoded_msg if x in string.printable)
 						decoded_msg=decoded_msg.replace('\r',' ').replace('\n',' ')
 						encoded_messages=encoded_messages+decoded_msg+"\n"
+					else:
+						continue
 				if (output.address==addr):
 					received_amount=output.value+received_amount
 					receiving_tx=1
@@ -397,7 +402,7 @@ current_level=0
 in_depth="F"
 for x in range(0, config.move_forward):
 	current_level+=1
-	rw="Select distinct to_addr,sum(amount_sent) from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses) group by to_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";"
+	rw="Select to_addr,sum(amount_sent) from "+filename+"transactions where to_addr not in (select address from "+filename+"addresses) group by to_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";"
 	cur.execute(rw)
         new_list=cur.fetchall()
         for ad in new_list:
@@ -411,7 +416,7 @@ for x in range(0, config.move_forward):
 in_depth="B"
 for x in range(0, config.go_backward):
 	current_level+=1
-        cur.execute("Select distinct from_addr,sum(amount_sent) from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses) group by to_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";")
+        cur.execute("Select from_addr,sum(amount_sent) from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses) group by from_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";")
         new_list=cur.fetchall()
         for ad in new_list:
                 if (processed>=config.max_addresses):
