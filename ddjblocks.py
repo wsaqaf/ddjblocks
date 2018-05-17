@@ -191,6 +191,7 @@ def load_addr(addr):
 	all_addresses=[addr]+all_addresses
 	
 	tx_left=1
+	valid_address=0
 	offset_id=0
 	max_reached=0
 
@@ -198,7 +199,15 @@ def load_addr(addr):
 	   if max_reached:
 		break
 	   if (tx_count==0):
-	        address = blockexplorer.get_address(addr,api_code=config.api_code)
+	        try:
+			address = blockexplorer.get_address(addr,api_code=config.api_code)
+			valid_address=1
+		except KeyboardInterrupt:
+			cleanexit()
+		except:
+			print "Could not get address: "+addr+" Skipping..."
+			valid_address=0
+			break
 		cur.execute("SELECT tx_count FROM "+filename+"addresses WHERE address='"+addr+"';")
 		try:
 			old_n_tx=cur.fetchone()[0]
@@ -243,7 +252,7 @@ def load_addr(addr):
 		change_addresses=[]
 		encoded_messages=""
 
-                print in_depth+str(current_level)+"TX:",tx_count,transaction.hash," ("+str(tx_count)+"/"+str(address.n_tx)+")"
+                print in_depth+str(current_level)+"TX:",tx_count,transaction.hash,"at"+str(tx_time)+" ("+str(tx_count)+"/"+str(address.n_tx)+")"
 
         	if (config.direction!=2):
           		for input in transaction.inputs:
@@ -292,6 +301,9 @@ def load_addr(addr):
 				total_output=output.value+total_output
                 fee=(total_input-total_output)
 	   	if (receiving_tx):
+			if not main_sending_address:
+				main_sending_address="Miner reward"
+				fee=0
                 	row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                         cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
                 if (sending_tx):
@@ -306,12 +318,12 @@ def load_addr(addr):
                         print "Reached max transactions",config.max_transactions,"... skipping this address and moving to next"
                         max_reached=1
 			break
+	if valid_address:
+		cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(address.n_tx)+") ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(address.n_tx)+";")
 
-	cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(address.n_tx)+") ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(address.n_tx)+";")
-
-   	processed+=1
-	perc=(100*processed)/config.max_addresses;
-	print "Processed address ("+str(processed)+"/"+str(config.max_addresses)+") [%"+str(perc)+"]";
+   		processed+=1
+		perc=(100*processed)/config.max_addresses;
+		print "Processed address ("+str(processed)+"/"+str(config.max_addresses)+") [%"+str(perc)+"]";
 	
 	return
 ###
@@ -414,6 +426,7 @@ for x in range(0, config.move_forward):
 		load_addr(ad[0])
 
 in_depth="B"
+current_level=0
 for x in range(0, config.go_backward):
 	current_level+=1
         cur.execute("Select from_addr,sum(amount_sent) from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses) group by from_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";")
