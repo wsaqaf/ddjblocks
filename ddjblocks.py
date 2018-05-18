@@ -98,6 +98,7 @@ def update_rates_file():
 
 	today=time.strftime("%Y-%m-%d", time.gmtime())
 	if (not linecache.getline(config.rates_file, 1).startswith(today)):
+		print "Adding rate for today"
 		url='https://apiv2.bitcoinaverage.com/convert/global?from=BTC&to=USD&amount=1'
 		result2 = requests.get(url=url, headers=headers)
 		usd_rate=json.loads(result2.content)['price']
@@ -139,7 +140,7 @@ def create_tx_table(tble):
 
       	try:
         	cur.execute("CREATE TABLE "+tble+" (tx_i VARCHAR(255) PRIMARY KEY, from_addr VARCHAR(255), to_addr VARCHAR(255), time_sent TIMESTAMP, "
-			    "amount_sent real, fee real, relayed_IP VARCHAR(255), is_utxo boolean, notes VARCHAR(255), messages VARCHAR(255));")
+			    "amount_sent bigint, fee bigint, relayed_IP VARCHAR(255), is_utxo boolean, notes VARCHAR(255), messages VARCHAR(255));")
                 cur.execute("CREATE INDEX ON "+tble+" (tx_i);")
 
         	print "New tx table "+tble+" created."
@@ -204,8 +205,8 @@ def load_addr(addr):
 			valid_address=1
 		except KeyboardInterrupt:
 			cleanexit()
-		except:
-			print "Could not get address: "+addr+" Skipping..."
+		except Exception, e:
+			print str(e)+" Could not get address: "+addr+" Skipping..."
 			valid_address=0
 			break
 		cur.execute("SELECT tx_count FROM "+filename+"addresses WHERE address='"+addr+"';")
@@ -304,11 +305,29 @@ def load_addr(addr):
 			if not main_sending_address:
 				main_sending_address="Miner reward"
 				fee=0
-                	row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
-                        cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
+			if main_sending_address!=addr:
+                		row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                        	cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
+			elif sent_amount<received_amount:
+                                row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                                cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
+				
                 if (sending_tx):
-                        row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
-                        cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
+			if main_receiving_address!=addr:
+#		                if (transaction.hash=="b91d49ef69aa9d210278d6f7fe00637840266ba9bc6c053c4440af9ee70400fc"):
+#                		        print "stx:"+str(sending_tx)+" mra:"+main_receiving_address+" r:"+str(received_amount)+" s:"+str(sent_amount)+" '"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+#                        		print "-------"
+
+                        	row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+#                                if (transaction.hash=="b91d49ef69aa9d210278d6f7fe00637840266ba9bc6c053c4440af9ee70400fc"):
+#					print row
+#					print "-------"
+
+                        	cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
+			elif sent_amount>received_amount:
+                                row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                                cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
+				
 	   	if (found_change_addresses):
 			all_addresses=list(set(all_addresses)|set(change_addresses))
 			all_addresses.remove(addr)
@@ -332,7 +351,7 @@ def load_addr(addr):
 
 # Some global variable initialisations
 
-addresses=pd.DataFrame(['address'])
+addresses=pd.DataFrame([0])
 filename=''
 original_file=''
 processed=0
@@ -354,7 +373,9 @@ if len(sys.argv)>1:
                 filename=os.path.basename("cases/"+sys.argv[1]).split('.')[0]+"_"
 		original_file="cases/"+sys.argv[1]
                 addresses=pd.read_csv("cases/"+sys.argv[1])
-        else:
+		with open("cases/"+sys.argv[1]) as f:
+		    addresses = [line.rstrip() for line in f]        
+	else:
                 print "the input file cases/"+sys.argv[1]+" could not be found"
                 cleanexit()
 else:
@@ -379,9 +400,9 @@ cur.execute("select true from ddjblocks.btc_rates where i_date=DATE 'today';")
 if not cur.fetchone():
 	try:
 		time_modified=os.path.getmtime(config.rates_file)
-		if (time_modified-time.time())>43200:
+		if time.time()-time_modified>43200: #more than 12 hours have passed since update
+                        print "Updatng rates file from bitcoinaverage.com!"
 			update_rates_file()
-			print "Updated rates file from bitcoinaverage.com!"
 		else:
 			print "using existing rates file"
 	except:
@@ -395,7 +416,7 @@ if not cur.fetchone():
 		if not cur.fetchone():
 			cur.execute("insert into ddjblocks.btc_rates values('"+row[0]+"', "+row[3]+");")
 
-total_addresses=addresses.address.count()
+total_addresses=len(addresses)
 all_addresses=[]
 
 current_level=""
@@ -403,12 +424,12 @@ in_depth=""
 
 max_reached=0
 
-for index, row in addresses.iterrows():
+for row in addresses:
         if (processed>=config.max_addresses):
                 print "Max addresses ("+str(config.max_addresses)+") processed, exiting...\n"
 		max_reached=1
                 break;
-	load_addr(row['address'])
+	load_addr(row)
 
 current_level=0
 in_depth="F"
