@@ -307,10 +307,10 @@ def load_addr(addr):
 				main_sending_address="Miner reward"
 				fee=0
 			if main_sending_address!=addr:
-                		row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                		row="'"+addr+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                         	cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 			elif sent_amount<received_amount:
-                                row="'"+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                                row="'"+addr+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                                 cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 				
                 if (sending_tx):
@@ -319,14 +319,14 @@ def load_addr(addr):
 #                		        print "stx:"+str(sending_tx)+" mra:"+main_receiving_address+" r:"+str(received_amount)+" s:"+str(sent_amount)+" '"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
 #                        		print "-------"
 
-                        	row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                        	row="'"+addr+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
 #                                if (transaction.hash=="b91d49ef69aa9d210278d6f7fe00637840266ba9bc6c053c4440af9ee70400fc"):
 #					print row
 #					print "-------"
 
                         	cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 			elif sent_amount>received_amount:
-                                row="'"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+                                row="'"+addr+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                                 cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 				
 	   	if (found_change_addresses):
