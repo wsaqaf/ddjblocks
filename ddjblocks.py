@@ -186,6 +186,7 @@ def load_addr(addr):
 	global all_addresses
 	global current_level
 	global in_depth
+	global initial_total_addresses
 
 	tx_count=0
 
@@ -341,8 +342,10 @@ def load_addr(addr):
 		cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(address.n_tx)+") ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(address.n_tx)+";")
 
    		processed+=1
-		perc=(100*processed)/config.max_addresses;
-		print "Processed address ("+str(processed)+"/"+str(config.max_addresses)+") [%"+str(perc)+"]";
+		if (initial_total_addresses>config.max_addresses):
+			initial_total_addresses=config.max_addresses	
+		perc=(100*processed)/initial_total_addresses;
+		print "Processed address ("+str(processed)+"/"+str(initial_total_addresses)+") [%"+str(perc)+"]";
 	
 	return
 ###
@@ -375,6 +378,7 @@ if len(sys.argv)>1:
                 addresses=pd.read_csv("cases/"+sys.argv[1])
 		with open("cases/"+sys.argv[1]) as f:
 		    addresses = [line.rstrip() for line in f]        
+		initial_total_addresses=len(addresses)
 	else:
                 print "the input file cases/"+sys.argv[1]+" could not be found"
                 cleanexit()
