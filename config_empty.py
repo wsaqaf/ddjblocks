@@ -10,10 +10,10 @@ dbpw=""
 change_addresses=0
 
 # How many addresses should the script be able to handle at once
-max_addresses=1000 
+max_addresses=0 
 
 # Max transactions per address to check on any given level
-max_transactions=1000
+max_transactions=0
 
 # 1 means incoming only, 2 means outgoing only, 0 means both are allowed
 direction=0 

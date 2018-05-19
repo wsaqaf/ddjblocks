@@ -124,7 +124,7 @@ def create_address_table(tble):
 	global cur
 
         try:
-                cur.execute("CREATE TABLE "+tble+" (address VARCHAR(255) PRIMARY KEY, updated TIMESTAMP, tx_count INTEGER)")
+                cur.execute("CREATE TABLE "+tble+" (address VARCHAR(255) PRIMARY KEY, updated TIMESTAMP, tx_count INTEGER, last_hash VARCHAR(255))")
 		cur.execute("CREATE INDEX ON "+tble+" (address);")
 
                 print "New address table "+tble+" created."
@@ -196,10 +196,12 @@ def load_addr(addr):
 	valid_address=0
 	offset_id=0
 	max_reached=0
+	processed_count=0
 
 	while (1):
 	   if max_reached:
 		break
+	
 	   if (tx_count==0):
 	        try:
 			address = blockexplorer.get_address(addr,api_code=config.api_code)
@@ -215,12 +217,16 @@ def load_addr(addr):
 			old_n_tx=cur.fetchone()[0]
 			if (old_n_tx):
 				if old_n_tx<address.n_tx:
-					tx_count=old_n_tx
-					print "Updating tx record for "+addr
-					continue				 
+					if (config.max_transactions<50 and config.max_transactions>0):
+						margin=config.max_transactions
+					else:
+						margin=50
+					tx_count=old_n_tx-margin
+			                tx_left=address.n_tx-tx_count
+					print "Resuming from tx # "+str(tx_count)+" for "+addr
 				else:
-					print in_depth+str(current_level)+"TX record for "+addr+" up-to-date. Skipping..."
-					break	
+					print "All transactions for "+addr+" have already been fetched. Skipping..."
+					break
                 except:
                         pass
 	   else:
@@ -302,6 +308,10 @@ def load_addr(addr):
 				out_count+=1
 				total_output=output.value+total_output
                 fee=(total_input-total_output)
+
+#		if transaction.hash=="f614779da7278f5d04684d97dd09d4471be4ba50a32a37006d906f427626a93d":
+#			print "rtx:"+str(receiving_tx)+" msa:("+main_sending_address+") '"+addr+transaction.hash+"', '"+main_sending_address+"', '"+addr+"', '"+str(tx_time)+"', "+str(received_amount-sent_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo))+",'To "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
+#			cleanexit()
 	   	if (receiving_tx):
 			if not main_sending_address:
 				main_sending_address="Miner reward"
@@ -315,34 +325,26 @@ def load_addr(addr):
 				
                 if (sending_tx):
 			if main_receiving_address!=addr:
-#		                if (transaction.hash=="b91d49ef69aa9d210278d6f7fe00637840266ba9bc6c053c4440af9ee70400fc"):
-#                		        print "stx:"+str(sending_tx)+" mra:"+main_receiving_address+" r:"+str(received_amount)+" s:"+str(sent_amount)+" '"+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
-#                        		print "-------"
-
                         	row="'"+addr+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
-#                                if (transaction.hash=="b91d49ef69aa9d210278d6f7fe00637840266ba9bc6c053c4440af9ee70400fc"):
-#					print row
-#					print "-------"
-
                         	cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
 			elif sent_amount>received_amount:
                                 row="'"+addr+transaction.hash+"', '"+addr+"', '"+main_receiving_address+"', '"+str(tx_time)+"',"+str(sent_amount-received_amount)+", "+str(fee)+", '"+transaction.relayed_by+"', "+str(bool(is_utxo_i))+", 'From "+filename[:-1]+"', '"+encoded_messages.replace("'","''")+"'"
                                 cur.execute("INSERT INTO "+filename+"transactions VALUES("+row+") ON CONFLICT (tx_i) DO NOTHING;")
-				
+
+                cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(tx_count)+",'"+transaction.hash+"') ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(tx_count)+", last_hash='"+transaction.hash+"';")
 	   	if (found_change_addresses):
 			all_addresses=list(set(all_addresses)|set(change_addresses))
 			all_addresses.remove(addr)
 			all_addresses=[addr]+all_addresses
-
-                if (tx_count>=config.max_transactions):
-                        print "Reached max transactions",config.max_transactions,"... skipping this address and moving to next"
+		processed_count+=1
+                if (config.max_transactions!=0 and processed_count>=config.max_transactions):
+                        print "Reached max transactions",config.max_transactions,"... skipping"
                         max_reached=1
 			break
-	if valid_address:
-		cur.execute("INSERT INTO "+filename+"addresses VALUES('"+addr+"',NOW(),"+str(address.n_tx)+") ON CONFLICT (address) DO UPDATE SET updated=NOW(),tx_count="+str(address.n_tx)+";")
 
+	if valid_address:
    		processed+=1
-		if (initial_total_addresses>config.max_addresses):
+		if (config.max_addresses!=0 and initial_total_addresses>=config.max_addresses):
 			initial_total_addresses=config.max_addresses	
 		perc=(100*processed)/initial_total_addresses;
 		print "Processed address ("+str(processed)+"/"+str(initial_total_addresses)+") [%"+str(perc)+"]";
@@ -429,7 +431,7 @@ in_depth=""
 max_reached=0
 
 for row in addresses:
-        if (processed>=config.max_addresses):
+        if (config.max_addresses!=0 and processed>=config.max_addresses):
                 print "Max addresses ("+str(config.max_addresses)+") processed, exiting...\n"
 		max_reached=1
                 break;
@@ -443,7 +445,7 @@ for x in range(0, config.move_forward):
 	cur.execute(rw)
         new_list=cur.fetchall()
         for ad in new_list:
-	        if (processed>=config.max_addresses):
+	        if (config.max_addresses!=0 and processed>=config.max_addresses):
         	        if not max_reached:
 				print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
 			max_reached=1
@@ -457,7 +459,7 @@ for x in range(0, config.go_backward):
         cur.execute("Select from_addr,sum(amount_sent) from "+filename+"transactions where from_addr not in (select address from "+filename+"addresses) group by from_addr order by sum(amount_sent) desc limit "+str(config.addresses_per_level)+";")
         new_list=cur.fetchall()
         for ad in new_list:
-                if (processed>=config.max_addresses):
+                if (config.max_addresses!=0 and processed>=config.max_addresses):
                         if not max_reached:
 				print "Max addresses ("+str(config.max_addresses)+" processed, exiting...\n"
 			max_reached=1
